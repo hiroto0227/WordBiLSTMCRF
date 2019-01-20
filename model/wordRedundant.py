@@ -11,7 +11,7 @@ from torch import optim
 sys.path.append("../")
 sys.path.append("./")
 from sentencepieces import sp_tokenizer
-from utils import data, vocab, trainutils, labels
+from utils import data, vocab, trainutils, labels, lossmanager
 from utils.trainutils import get_variable
 from load_config import load_state
 #from bilstmcrf import BiLSTMLSTMCRF
@@ -63,6 +63,7 @@ class WordRedundant:
                 self.sentencepieces.append(sp)
         
     def train(self, char=True):
+        loss_manager = lossmanager.LossManager()
         word_encoder = vocab.LabelEncoder()
         char_encoder = vocab.LabelEncoder()
         label_encoder = vocab.LabelEncoder(label=True)
@@ -125,6 +126,8 @@ class WordRedundant:
         
         for epoch in range(1, self.args.epoch + 1):
             print("\n\n================ {} epoch ==================".format(epoch))
+            model.train()
+            model.zero_grad()
             start = time.time()
             loss_per_epoch = 0
             for i, (word_batch, char_batch, tokens_batch, f_masks_batch, b_masks_batch, label_batch, mask_batch, char_mask_batch) in \
@@ -138,7 +141,6 @@ class WordRedundant:
                                                  word_pad_ix=word_encoder.label2id[labels.PAD], 
                                                  label_pad_ix=label_encoder.label2id[labels.PAD], 
                                                  char_pad_ix=char_encoder.label2id[labels.PAD]))):
-                model.zero_grad()
                 word_batch = trainutils.get_variable(torch.LongTensor(word_batch), gpu=self.args.gpu).transpose(1, 0)
                 char_batch = trainutils.get_variable(torch.LongTensor(char_batch), gpu=self.args.gpu).transpose(1, 0)
                 tokens_batch = [trainutils.get_variable(torch.LongTensor(token_batch), gpu=self.args.gpu).transpose(1, 0) for token_batch in tokens_batch]
@@ -147,16 +149,19 @@ class WordRedundant:
                 b_masks_batch = [trainutils.get_variable(torch.LongTensor(b_mask_batch), gpu=self.args.gpu).transpose(1, 0) for b_mask_batch in b_masks_batch]
                 mask_batch = trainutils.get_variable(torch.ByteTensor(mask_batch), gpu=self.args.gpu).transpose(1, 0)
                 char_mask_batch = trainutils.get_variable(torch.FloatTensor(char_mask_batch), gpu=self.args.gpu).transpose(1, 0)
-                loss = model.loss(word_batch, char_batch, tokens_batch, f_masks_batch, b_masks_batch, label_batch, mask_batch, char_mask_batch) / word_batch.shape[1]
+                loss = model.loss(word_batch, char_batch, tokens_batch, f_masks_batch, b_masks_batch, label_batch, mask_batch, char_mask_batch)
                 if i % 10 == 0:
+                    loss_manager.append(loss)
                     print("\nword_batch: {}\nloss: {}".format(word_batch.shape, loss))
                 loss.backward()
                 optimizer.step()
+                model.zero_grad()
                 loss_per_epoch += float(loss)
             print("loss_per_epoch: {}\ntime_per_epoch: {}".format(loss_per_epoch, time.time() - start))
             if epoch % 10 == 0:
                 torch.save(model.state_dict(), self.args.save_model + str(epoch))
                 print("model saved! {}".format(self.args.save_model + str(epoch)))
+        loss_manager.draw_graph(self.args.save_model + ".png")
         torch.save(model.state_dict(), self.args.save_model)
 
     def predict(self):

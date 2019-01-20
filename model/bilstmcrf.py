@@ -41,17 +41,17 @@ class BiLSTMLSTMCRF(nn.Module):
         
         # init word pretrain embedding
         self.word_embedding = nn.Embedding(word_vocab_dim, word_embed_dim)
-        self.word_embedding.weight.data.copy_(torch.from_numpy(word_pretrain_embed))
-        if unk_ix:
-            self.word_embedding.weight.data[unk_ix] = torch.from_numpy(np.random.randn(word_embed_dim) / unk_embed_scale)
-        for zero_ix in zero_ixs:
-            self.word_embedding.weight.data[zero_ix] = torch.from_numpy(np.zeros(word_embed_dim))
+        #self.word_embedding.weight.data.copy_(torch.from_numpy(word_pretrain_embed))
+        #if unk_ix:
+        #    self.word_embedding.weight.data[unk_ix] = torch.from_numpy(np.random.randn(word_embed_dim) / unk_embed_scale)
+        #for zero_ix in zero_ixs:
+        #    self.word_embedding.weight.data[zero_ix] = torch.from_numpy(np.zeros(word_embed_dim))
         
         self.char_embedding = nn.Embedding(char_vocab_dim, char_embed_dim)
-        if unk_ix:
-            self.char_embedding.weight.data[unk_ix] = torch.from_numpy(np.random.randn(char_embed_dim) / unk_embed_scale)
-        for zero_ix in zero_ixs:
-            self.char_embedding.weight.data[zero_ix] = torch.from_numpy(np.zeros(char_embed_dim))
+        #if unk_ix:
+        #    self.char_embedding.weight.data[unk_ix] = torch.from_numpy(np.random.randn(char_embed_dim) / unk_embed_scale)
+        #for zero_ix in zero_ixs:
+        #    self.char_embedding.weight.data[zero_ix] = torch.from_numpy(np.zeros(char_embed_dim))
 
         # init tokens pretrain embedding
         self.token_embeddings = [nn.Embedding(token_vocab_dim, token_embed_dim) for token_vocab_dim in token_vocab_dims]
