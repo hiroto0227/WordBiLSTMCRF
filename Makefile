@@ -57,4 +57,4 @@ predict:
 	python3.7 model/wordRedundant.py --mode predict --config-path model/baseline.config;
 
 evaluate:
-	python3.7 evaluate/evaluate.py --input-path ./Repository/SeqData/predicted.csv;
+	python3.7 evaluate/evaluate.py --schema bioes --input-path ./Repository/SeqData/predicted.csv --verbose-num 100;

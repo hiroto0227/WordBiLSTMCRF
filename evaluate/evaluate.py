@@ -1,17 +1,25 @@
-# -*- coding: utf-8 -*-
-# @Author: Jie
-# @Date:   2017-02-16 09:53:19
-# @Last Modified by:   Jie Yang,     Contact: jieynlp@gmail.com
-# @Last Modified time: 2017-12-19 15:23:12
-
-# from operator import add
-#
 from __future__ import print_function
 import sys
 import argparse
+import collections
+import pprint
+
+
+def update_word_counter(matrix, counter, word_list, tag="CHEM"):
+    for row in matrix:
+        if "," in row:
+            start, end = row.replace(tag, "")[1:-1].split(",")
+        else:
+            start = row.replace(tag, "")[1: -1]
+            end = int(start) + 1
+        counter.update({" ".join(word_list[int(start):int(end)+1]): 1})
+    return counter
 
 ## input as sentence level labelst_ner
-def get_ner_fmeasure(golden_lists, predict_lists, char_lists, label_type="BMES"):
+def get_ner_fmeasure(sentence_lists, golden_lists, predict_lists, label_type="BMES"):
+    golden_counter = collections.Counter()
+    predict_counter = collections.Counter()
+    right_counter = collections.Counter()
     sent_num = len(golden_lists)
     golden_full = []
     predict_full = []
@@ -19,10 +27,9 @@ def get_ner_fmeasure(golden_lists, predict_lists, char_lists, label_type="BMES")
     right_tag = 0
     all_tag = 0
     for idx in range(0,sent_num):
-        # word_list = sentence_lists[idx]
+        word_list = sentence_lists[idx]
         golden_list = golden_lists[idx]
         predict_list = predict_lists[idx]
-        char_list = char_lists[idx]
         for idy in range(len(golden_list)):
             if golden_list[idy] == predict_list[idy]:
                 right_tag += 1
@@ -31,11 +38,12 @@ def get_ner_fmeasure(golden_lists, predict_lists, char_lists, label_type="BMES")
             gold_matrix = get_ner_BMES(golden_list)
             pred_matrix = get_ner_BMES(predict_list)
         else:
-            gold_matrix = get_ner_BIO(golden_list, char_list)
-            pred_matrix = get_ner_BIO(predict_list, char_list)
-        # print "gold", gold_matrix
-        # print "pred", pred_matrix
+            gold_matrix = get_ner_BIO(golden_list, word_list)
+            pred_matrix = get_ner_BIO(predict_list, word_list)
         right_ner = list(set(gold_matrix).intersection(set(pred_matrix)))
+        golden_counter = update_word_counter(gold_matrix, golden_counter, word_list)
+        predict_counter = update_word_counter(pred_matrix, predict_counter, word_list)
+        right_counter = update_word_counter(right_ner, right_counter, word_list)
         golden_full += gold_matrix
         predict_full += pred_matrix
         right_full += right_ner
@@ -57,7 +65,7 @@ def get_ner_fmeasure(golden_lists, predict_lists, char_lists, label_type="BMES")
     accuracy = (right_tag+0.0)/all_tag
     # print "Accuracy: ", right_tag,"/",all_tag,"=",accuracy
     print("gold_num = ", golden_num, " pred_num = ", predict_num, " right_num = ", right_num)
-    return accuracy, precision, recall, f_measure
+    return accuracy, precision, recall, f_measure, golden_counter, predict_counter, right_counter
 
 
 def reverse_style(input_string):
@@ -114,7 +122,7 @@ def get_ner_BMES(label_list):
     return stand_matrix
 
 
-def get_ner_BIO(label_list, char_list):
+def get_ner_BIO(label_list, word_list):
     # list_len = len(word_list)
     # assert(list_len == len(label_list)), "word list size unmatch with label list"
     list_len = len(label_list)
@@ -125,7 +133,6 @@ def get_ner_BIO(label_list, char_list):
     tag_list = []
     stand_matrix = []
     for i in range(0, list_len):
-        # wordlabel = word_list[i]
         current_label = label_list[i].upper()
         if begin_label in current_label:
             if index_tag == '':
@@ -149,7 +156,6 @@ def get_ner_BIO(label_list, char_list):
                 tag_list.append(whole_tag +',' + str(i-1))
             whole_tag = ''
             index_tag = ''
-
     if (whole_tag != '')&(index_tag != ''):
         tag_list.append(whole_tag)
     tag_list_len = len(tag_list)
@@ -182,7 +188,7 @@ def readSentence(input_file):
     return sentences,labels
 
 
-def readTwoLabelSentence(input_file, golden_col, pred_col, char_col):
+def readTwoLabelSentence(input_file, golden_col, pred_col):
     in_lines = open(input_file,'r').readlines()
     sentences = []
     predict_labels = []
@@ -190,8 +196,6 @@ def readTwoLabelSentence(input_file, golden_col, pred_col, char_col):
     sentence = []
     predict_label = []
     golden_label = []
-    char_lists = []
-    char_list = []
     for line in in_lines:
         pair = line.replace("\n", "").split("\t")
         if "##score##" in line:
@@ -200,41 +204,30 @@ def readTwoLabelSentence(input_file, golden_col, pred_col, char_col):
             sentences.append(sentence)
             golden_labels.append(golden_label)
             predict_labels.append(predict_label)
-            char_lists.append(char_list)
             sentence = []
-            char_list = []
             golden_label = []
             predict_label = []
         else:
             sentence.append(pair[0])
             golden_label.append(pair[golden_col])
             predict_label.append(pair[pred_col])
-            char_list.append(pair[char_col])
 
-    return sentences,golden_labels,predict_labels,char_lists
-
-
-def fmeasure_from_file(golden_file, predict_file, label_type="BMES"):
-    print("Get f measure from file:", golden_file, predict_file)
-    print("Label format:",label_type)
-    golden_sent,golden_labels = readSentence(golden_file)
-    predict_sent,predict_labels = readSentence(predict_file)
-    P,R,F = get_ner_fmeasure(golden_labels, predict_labels, label_type)
-    print ("P:%sm R:%s, F:%s"%(P,R,F))
-
-
-
-def fmeasure_from_singlefile(twolabel_file, label_type="BMES", pred_col=-1):
-    sent,golden_labels,predict_labels = readTwoLabelSentence(twolabel_file, pred_col)
-    P,R,F = get_ner_fmeasure(golden_labels, predict_labels, label_type)
-    print ("P:%s, R:%s, F:%s"%(P,R,F))
+    return sentences,golden_labels,predict_labels
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser("mertics")
+    parser.add_argument("--schema", type=str, help="tag schema")
     parser.add_argument("--input-path", type=str, help="predicted path")
+    parser.add_argument("--verbose-num", type=int, help="print golden and predict counter most common num")
     opt = parser.parse_args()
 
-    sentences, golden_labels, predict_labels, char_lists = readTwoLabelSentence(opt.input_path, golden_col=-2, pred_col=-1, char_col=0)
-    acc, P, R, F = get_ner_fmeasure(golden_labels, predict_labels, char_lists, "BIO")
+    sentences, golden_labels, predict_labels = readTwoLabelSentence(opt.input_path, golden_col=-2, pred_col=-1)
+    acc, P, R, F, golden_counter, predict_counter, right_counter = get_ner_fmeasure(sentences, golden_labels, predict_labels, opt.schema.upper())
+    print("============= golden ==================")
+    pprint.pprint(golden_counter.most_common(opt.verbose_num))
+    print("============= predict =================")
+    pprint.pprint(predict_counter.most_common(opt.verbose_num))
+    print("============= right =================")
+    pprint.pprint(right_counter.most_common(opt.verbose_num))
     print ("Acc:%s P:%sm R:%s, F:%s"%(acc, P, R, F))

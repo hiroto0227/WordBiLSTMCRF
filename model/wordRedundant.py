@@ -130,6 +130,7 @@ class WordRedundant:
             model.zero_grad()
             start = time.time()
             loss_per_epoch = 0
+            loss_per_batches = 0
             for i, (word_batch, char_batch, tokens_batch, f_masks_batch, b_masks_batch, label_batch, mask_batch, char_mask_batch) in \
                    tqdm(enumerate(data.batch_gen(word_vec, 
                                                  char_vecs, 
@@ -150,9 +151,11 @@ class WordRedundant:
                 mask_batch = trainutils.get_variable(torch.ByteTensor(mask_batch), gpu=self.args.gpu).transpose(1, 0)
                 char_mask_batch = trainutils.get_variable(torch.FloatTensor(char_mask_batch), gpu=self.args.gpu).transpose(1, 0)
                 loss = model.loss(word_batch, char_batch, tokens_batch, f_masks_batch, b_masks_batch, label_batch, mask_batch, char_mask_batch)
+                loss_per_batches += float(loss)
                 if i % 10 == 0:
-                    loss_manager.append(loss)
-                    print("\nword_batch: {}\nloss: {}".format(word_batch.shape, loss))
+                    loss_manager.append(loss_per_batches)
+                    print("\nloss_per_batches: {}".format(loss_per_batches))
+                    loss_per_batches = 0
                 loss.backward()
                 optimizer.step()
                 model.zero_grad()
