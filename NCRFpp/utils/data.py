@@ -35,6 +35,7 @@ class Data:
 
         ### SubWord ###
         self.sw_num = 0
+        self.sentence_piece_dirs = []
         self.sentence_piece_models = []
         self.sw_alphabet_list = [Alphabet('sw') for i in range(self.sw_num)]
 
@@ -323,7 +324,8 @@ class Data:
             sent_length = len(predict_results[idx])
             for idy in range(sent_length):
                 ## content_list[idx] is a list with [word, char, label]
-                fout.write(content_list[idx][0][idy].encode('utf-8') + " " + predict_results[idx][idy] + '\n')
+                #fout.write(content_list[idx][0][idy] + "\t" + predict_results[idx][idy] + '\n')
+                fout.write(predict_results[idx][idy] + '\n')
             fout.write('\n')
         fout.close()
         print("Predict %s result has been written into file. %s"%(name, self.decode_dir))
@@ -334,10 +336,16 @@ class Data:
         tmp_dict = pickle.load(f)
         f.close()
         self.__dict__.update(tmp_dict)
+        for sp_path in tmp_dict['sentence_piece_dirs']:
+            sp = sp_tokenizer.SentencePieceTokenizer()
+            sp.load(sp_path)
+            self.sentence_piece_models.append(sp)
 
     def save(self,save_file):
         f = open(save_file, 'wb')
-        pickle.dump(self.__dict__, f, 2)
+        dic =  self.__dict__
+        del dic['sentence_piece_models']
+        pickle.dump(dic, f, 2)
         f.close()
 
 
@@ -425,12 +433,13 @@ class Data:
         the_item = 'sw_emb_dirs'
         if the_item in config:
             self.sw_emb_dirs = str2list(config[the_item])
-        the_item = 'sentence_piece_models'
+        the_item = 'sentence_piece_dirs'
         if the_item in config:
             for sp_path in str2list(config[the_item]):
                 sp = sp_tokenizer.SentencePieceTokenizer()
-                print(sp_path)
+                print("sentence_piece path: {}".format(sp_path))
                 sp.load(sp_path)
+                self.sentence_piece_dirs.append(sp_path)
                 self.sentence_piece_models.append(sp)
         the_item = 'MAX_SENTENCE_LENGTH'
         if the_item in config:
@@ -593,7 +602,7 @@ def str2bool(string):
         return False
 
 def str2list(string):
-    if re.match("\[.*\]", string):
+    if re.match("\[.+\]", string):
         if "," in string:
             return [s.replace(" ", "") for s in string[1:-1].split(",")]
         else:
