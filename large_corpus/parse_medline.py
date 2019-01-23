@@ -29,6 +29,6 @@ if __name__ == "__main__":
             print("\n{}".format(filename))
             texts.extend(parse_medline(os.path.join(opt.input_dir, filename)))
 
-    with open(opt.output_path, "at", encoding="encoding='utf-8'") as f:
+    with open(opt.output_path, "at", encoding="utf-8") as f:
         print(len(texts))
         f.write("".join(texts))
