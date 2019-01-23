@@ -6,23 +6,24 @@ from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 class ContextualLSTM(nn.Module):
     def __init__(self, alphabet_size, pretrain_embedding, embedding_dim, hidden_dim, dropout, gpu):
-        super(ContextualLSTM, self).__init__()
+        super().__init__()
         self.gpu = gpu
         self.hidden_dim = hidden_dim // 2
         self.drop = nn.Dropout(dropout)
         self.embeddings = nn.Embedding(alphabet_size, embedding_dim)
         if pretrain_embedding is not None:
+            #pretrain_embedding[np.isnan(pretrain_embedding)] = 0
+            self.pretrain_embedding = pretrain_embedding
             self.embeddings.weight.data.copy_(torch.from_numpy(pretrain_embedding))
         else:
             self.embeddings.weight.data.copy_(torch.from_numpy(self.random_embedding(alphabet_size, embedding_dim)))
-        #self.f_lstm = nn.GRU(embedding_dim, self.hidden_dim, num_layers=1, batch_first=True)
         self.f_lstm = nn.LSTM(embedding_dim, self.hidden_dim, num_layers=1, batch_first=True)
-        #self.b_lstm = nn.GRU(embedding_dim, self.hidden_dim, num_layers=1, batch_first=True)
         self.b_lstm = nn.LSTM(embedding_dim, self.hidden_dim, num_layers=1, batch_first=True)
         if self.gpu:
             self.drop = self.drop.cuda()
             self.embeddings = self.embeddings.cuda()
-            self.lstm = self.lstm.cuda()
+            self.f_lstm = self.f_lstm.cuda()
+            self.b_lstm = self.b_lstm.cuda()
 
     def random_embedding(self, vocab_size, embedding_dim):
         pretrain_emb = np.empty([vocab_size, embedding_dim])
@@ -40,41 +41,65 @@ class ContextualLSTM(nn.Module):
             output:
                 Variable(batch_size, masked_length, hidden_dim)
         """
+        #### for debug
+        self.inputs = inputs
+        self.seq_length = seq_length
+        self.fmask = fmask
+        self.bmask = bmask
+        self.out_seq_length = out_seq_length
+        #### for debug
+
         batch_size = int(inputs.size(0))
-        # forward
-        embeds = self.drop(self.embeddings(inputs))
+        sw_seq_len = int(inputs.size(1))
+        
+        ################ Foward LSTM ####################
         f_hidden = None
+        embeds = self.drop(self.embeddings(inputs))
+        # forward lstm
         pack_input = pack_padded_sequence(embeds, seq_length, True)
         f_lstm_out, f_hidden = self.f_lstm(pack_input, f_hidden)
         f_lstm_out, _ = pad_packed_sequence(f_lstm_out)
         f_lstm_out = f_lstm_out.transpose(1, 0)
-        f_masked_out = torch.zeros(batch_size, out_seq_length, self.hidden_dim)
-        for batch_i, (out, mask) in enumerate(zip(f_lstm_out, fmask)):
-            mask = mask.unsqueeze(1).expand(-1, self.hidden_dim).byte()
-            masked = torch.masked_select(out, mask).view(-1, self.hidden_dim)
-            f_masked_out[batch_i, :masked.shape[0]] = masked
-        # backward
+        # mask process
+        fmask = fmask.unsqueeze(2).expand(batch_size, fmask.shape[1], self.hidden_dim).byte()
+        fmasked_out = f_lstm_out.masked_select(fmask).view(batch_size, out_seq_length, self.hidden_dim)
+        
+        ############### Backward LSTM ####################
         b_hidden = None
-        reverse_inputs = torch.zeros(batch_size, inputs.shape[1]).long()
-        reverse_bmask = torch.zeros(batch_size, inputs.shape[1]).byte()
+        # reverse for input
+        reverse_inputs, reverse_bmasks = [], []
+        max_seq_len = seq_length.max()
         for batch_i in range(batch_size):
-            reverse_idx = torch.LongTensor([idx for idx in range(seq_length[batch_i]-1, -1, -1)])
-            reverse_inputs[batch_i, :seq_length[batch_i]] = inputs[batch_i].index_select(0, reverse_idx)
-            reverse_bmask[batch_i, :seq_length[batch_i]] = bmask[batch_i].index_select(0, reverse_idx)
-        embeds = self.drop(self.embeddings(reverse_inputs))
+            reverse_idx = torch.LongTensor([idx for idx in range(seq_length[batch_i]-1, -1, -1)] + list(range(seq_length[batch_i], max_seq_len)))
+            reverse_inputs.append(inputs[batch_i].index_select(0, reverse_idx))
+            reverse_bmasks.append(bmask[batch_i].index_select(0, reverse_idx))
+        reverse_inputs_tensor = torch.cat(reverse_inputs).long().view(batch_size, max_seq_len)
+        reverse_bmask_tensor = torch.cat(reverse_bmasks).byte().view(batch_size, max_seq_len)
+        # Backward LSTM
+        embeds = self.drop(self.embeddings(reverse_inputs_tensor))
         pack_input = pack_padded_sequence(embeds, seq_length, True)
         b_lstm_out, b_hidden = self.b_lstm(pack_input, b_hidden)
         b_lstm_out, _ = pad_packed_sequence(b_lstm_out)
         b_lstm_out = b_lstm_out.transpose(1, 0)
-        b_masked_out = torch.zeros(batch_size, out_seq_length, self.hidden_dim)
-        for batch_i, (out, mask) in enumerate(zip(b_lstm_out, fmask)):
-            mask = mask.unsqueeze(1).expand(-1, self.hidden_dim).byte()
-            masked = torch.masked_select(out, mask).view(-1, self.hidden_dim)
-            reverse_idx = torch.LongTensor([idx for idx in range(masked.size(0)-1, -1, -1)])
-            b_masked_out[batch_i, :masked.shape[0]] = masked.index_select(0, reverse_idx)
+        # mask process
+        # 1番目のものよりも他のものがcut後大きくなる場合はそれに合わせる。
+        # if bmask[0].sum() < bmask.sum(dim=1).max():
+        #     padded_f_lstm_out = torch.zero(batch_size, bmask.sum(dim=1).max(), self.hidden_dim).long()
+        #     padded_f_lstm_out[:, :f_lstm_out.shape[1], :] = f_lstm_out
+        #     padded_bmask = torch.zero(batch_size, bmask.sum(dim=1).max()).byte()
+        #     padded_bmask[:, :bmask.shape[1]] = bmask
+        #     f_lstm_out = padded_f_lstm_out
+        #     bmask = padded_bmask
+        bmask = bmask.unsqueeze(2).expand(batch_size, inputs.shape[1], self.hidden_dim).byte()
+        bmasked_out = b_lstm_out.masked_select(bmask).view(batch_size, out_seq_length, self.hidden_dim)
+        # output reverse
+        bmasked_outs = []
+        for batch_i in range(batch_size):
+            reverse_idx = torch.LongTensor([idx for idx in range(out_seq_length-1, max(out_seq_length-seq_length[batch_i], 0)-1, -1)] + list(range(0, out_seq_length-seq_length[batch_i])))
+            bmasked_outs.append(bmasked_out[batch_i].index_select(0, reverse_idx))
+        bmasked_out = torch.cat(bmasked_outs).view(batch_size, out_seq_length, self.hidden_dim)
 
-        out = torch.cat([f_masked_out, b_masked_out], dim=2)
-        return out
+        return torch.cat([fmasked_out, bmasked_out], dim=2)
 
     def get_last_hidden(self, inputs, seq_length):
         """

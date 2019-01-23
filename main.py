@@ -245,8 +245,10 @@ def batchify_with_label(input_batch_list, gpu, if_train=True):
     for idx in range(feature_num):
         feature_seq_tensors.append(torch.zeros((batch_size, max_seq_len),requires_grad =  if_train).long())
     mask = torch.zeros((batch_size, max_seq_len), requires_grad =  if_train).byte()  #(batch_size, max_seq_len)
+    word_pad_lengths_for_sw = []
     for idx, (seq, label, seqlen) in enumerate(zip(words, labels, word_seq_lengths)):
         seqlen = seqlen.item()
+        word_pad_lengths_for_sw.append(max_seq_len - seqlen)
         word_seq_tensor[idx, :seqlen] = torch.LongTensor(seq)
         label_seq_tensor[idx, :seqlen] = torch.LongTensor(label)
         mask[idx, :seqlen] = torch.Tensor([1]*seqlen)
@@ -288,16 +290,19 @@ def batchify_with_label(input_batch_list, gpu, if_train=True):
         sw_bmasks_list_swapped[sw_ix] = [sw_bmasks_list[batch_ix][sw_ix] for batch_ix in range(batch_size)]  # (sw_num, batch_size, variable)
     for sw_ix in range(sw_num):
         sws = sws_list_swapped[sw_ix]
-        sw_seq_lengths = torch.LongTensor(list(map(len, sws))) #(batch_size, 1)
-        max_sw_seq_len = sw_seq_lengths.max().item()
+        # word の paddingも考慮に入れる。
+        sw_seq_lengths = torch.LongTensor(np.array(list(map(len, sws)) + np.array(word_pad_lengths_for_sw))) #(batch_size, 1)
+        max_sw_seq_len = sw_seq_lengths.max()
         sw_seq_tensor = torch.zeros((batch_size, max_sw_seq_len), requires_grad =  if_train).long()
         sw_seq_fmask = torch.zeros((batch_size, max_sw_seq_len)).byte()
         sw_seq_bmask = torch.zeros((batch_size, max_sw_seq_len)).byte()
-        for idx, (sw, fmask, bmask, seqlen) in enumerate(zip(sws, sw_fmasks_list_swapped[sw_ix], sw_bmasks_list_swapped[sw_ix], sw_seq_lengths)):
-            seqlen = seqlen.item()
+        for idx, (sw, fmask, bmask) in enumerate(zip(sws, sw_fmasks_list_swapped[sw_ix], sw_bmasks_list_swapped[sw_ix])):
+            seqlen = len(sw)
             sw_seq_tensor[idx, :seqlen] = torch.LongTensor(sw) 
             sw_seq_fmask[idx, :seqlen] = torch.ByteTensor(fmask)
+            sw_seq_fmask[idx, seqlen:seqlen+word_pad_lengths_for_sw[idx]] = 1  # swのwordに対してのpadding用
             sw_seq_bmask[idx, :seqlen] = torch.ByteTensor(bmask)
+            sw_seq_bmask[idx, seqlen:seqlen+word_pad_lengths_for_sw[idx]] = 1  # swのwordに対してのpadding用
         sw_seq_lengths, sw_perm_idx = sw_seq_lengths.sort(0, descending=True)
         sw_seq_tensor = sw_seq_tensor[sw_perm_idx]
         sw_seq_fmask = sw_seq_fmask[sw_perm_idx]
@@ -332,8 +337,9 @@ def train(data):
     print("Training model...")
     data.show_data_summary()
     save_data_name = data.model_dir +".dset"
-    #data.save(save_data_name)
+    data.save(save_data_name)
     model = SeqLabel(data)
+    print(model)
     # loss_function = nn.NLLLoss()
     if data.optimizer.lower() == "sgd":
         optimizer = optim.SGD(model.parameters(), lr=data.HP_lr, momentum=data.HP_momentum,weight_decay=data.HP_l2)

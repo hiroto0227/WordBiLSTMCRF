@@ -138,7 +138,7 @@ def build_pretrain_embedding(embedding_path, word_alphabet, embedd_dim=100, norm
         embedd_dict, embedd_dim = load_pretrain_emb(embedding_path)
     alphabet_size = word_alphabet.size()
     scale = np.sqrt(3.0 / embedd_dim)
-    pretrain_emb = np.empty([word_alphabet.size(), embedd_dim])
+    pretrain_emb = np.empty([word_alphabet.size(), embedd_dim], dtype=np.float)
     perfect_match = 0
     case_match = 0
     not_match = 0
@@ -158,6 +158,7 @@ def build_pretrain_embedding(embedding_path, word_alphabet, embedd_dim=100, norm
         else:
             pretrain_emb[index,:] = np.random.uniform(-scale, scale, [1, embedd_dim])
             not_match += 1
+    pretrain_emb[np.isnan(pretrain_emb)] = np.random.uniform(-scale, scale, [1])
     pretrained_size = len(embedd_dict)
     print("Embedding:\n     pretrain word:%s, prefect match:%s, case_match:%s, oov:%s, oov%%:%s"%(pretrained_size, perfect_match, case_match, not_match, (not_match+0.)/alphabet_size))
     return pretrain_emb, embedd_dim
