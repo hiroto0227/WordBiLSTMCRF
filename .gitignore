@@ -2,3 +2,8 @@ Repository/
 
 __pycache__/
 *.pyc
+*.ipynb
+
+.ipynb_checkpoints/
+.mypy_cache/
+.vscode/
