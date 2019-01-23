@@ -8,6 +8,7 @@ class SentencePieceTokenizer():
 
     def train(self, text_path, vocab_size):
         spm.SentencePieceTrainer.Train('--normalization_rule_name=identity --input={} --model_prefix=sp{} --vocab_size={} --model_type=unigram --mining_sentence_size=1000000'.format(text_path, vocab_size, vocab_size))
+        #spm.SentencePieceTrainer.Train('--normalization_rule_name=identity --input={} --model_prefix=sp{} --vocab_size={} --model_type=unigram --mining_sentence_size=1000000'.format(text_path, vocab_size, vocab_size))
 
     def load(self, sp_model_path):
         self.spe.Load(sp_model_path)

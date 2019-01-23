@@ -12,7 +12,7 @@ def make_file_for_sptrain(dirpath, outpath):
         with open(os.path.join(dirpath, fileid + '.txt'), 'rt') as f:
             text = f.read()
         texts.extend(re.split("(\n)", text))
-    with open(outpath, "at") as f:
+    with open(outpath, "at", encoding='utf-8') as f:
         for text in tqdm(texts):
             if text != "\n":
                 f.writelines([text + '\n'])

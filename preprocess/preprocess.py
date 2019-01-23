@@ -22,7 +22,7 @@ def writeSeqsTSV(char_seq, label_seq, outpath, mode="a"):
     end_ixs = []
     ix = 0
     _pre_char_seq = []
-    with open(outpath, mode) as f:
+    with open(outpath, mode, encoding='utf-8') as f:
         for i in range(len(char_seq)):
             if char_seq[i] == "\n":
                 f.write('\n')

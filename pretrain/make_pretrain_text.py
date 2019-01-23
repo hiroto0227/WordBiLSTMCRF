@@ -25,5 +25,5 @@ if __name__ == "__main__":
         for i, line in tqdm(enumerate(f.read().split("\n"))):
             tokenized_lines.append(re.sub(" {2,}", " ", " ".join(tokenize(line)).replace("\n", "")))
     
-    with open(opt.output_path, "wt") as f:
+    with open(opt.output_path, "wt", encoding='utf-8') as f:
         f.write("\n".join(tokenized_lines))

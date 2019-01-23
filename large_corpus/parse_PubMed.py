@@ -36,6 +36,6 @@ if __name__ == "__main__":
             if filename.startswith("18"):
                 texts.extend(parse_PubMed(os.path.join(opt.input_dir, filename)))
 
-    with open(opt.output_path, "at") as f:
+    with open(opt.output_path, "at", encoding='utf-8') as f:
         print(len(texts))
         f.write("\n".join(texts))
