@@ -118,8 +118,8 @@ def get_ner_BIO(label_list):
     # list_len = len(word_list)
     # assert(list_len == len(label_list)), "word list size unmatch with label list"
     list_len = len(label_list)
-    begin_label = 'B-'
-    inside_label = 'I-'
+    begin_label = 'B'
+    inside_label = 'I'
     whole_tag = ''
     index_tag = ''
     tag_list = []

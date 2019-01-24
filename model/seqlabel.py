@@ -24,6 +24,8 @@ class SeqLabel(nn.Module):
         print("use crf: ", self.use_crf)
 
         self.gpu = data.HP_gpu
+        print("============GPU==============")
+        print(self.gpu)
         self.average_batch = data.average_batch_loss
         ## add two more label for downlayer lstm, use original label size for CRF
         label_size = data.label_alphabet_size

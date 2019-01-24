@@ -13,17 +13,16 @@ class ContextualLSTM(nn.Module):
         self.embeddings = nn.Embedding(alphabet_size, embedding_dim)
         if pretrain_embedding is not None:
             #pretrain_embedding[np.isnan(pretrain_embedding)] = 0
-            self.pretrain_embedding = pretrain_embedding
             self.embeddings.weight.data.copy_(torch.from_numpy(pretrain_embedding))
         else:
             self.embeddings.weight.data.copy_(torch.from_numpy(self.random_embedding(alphabet_size, embedding_dim)))
         self.f_lstm = nn.LSTM(embedding_dim, self.hidden_dim, num_layers=1, batch_first=True)
         self.b_lstm = nn.LSTM(embedding_dim, self.hidden_dim, num_layers=1, batch_first=True)
         if self.gpu:
-            self.drop = self.drop.cuda()
-            self.embeddings = self.embeddings.cuda()
-            self.f_lstm = self.f_lstm.cuda()
-            self.b_lstm = self.b_lstm.cuda()
+            self.drop.cuda()
+            self.embeddings.cuda()
+            self.f_lstm.cuda()
+            self.b_lstm.cuda()
 
     def random_embedding(self, vocab_size, embedding_dim):
         pretrain_emb = np.empty([vocab_size, embedding_dim])
@@ -41,13 +40,13 @@ class ContextualLSTM(nn.Module):
             output:
                 Variable(batch_size, masked_length, hidden_dim)
         """
-        #### for debug
-        self.inputs = inputs
-        self.seq_length = seq_length
-        self.fmask = fmask
-        self.bmask = bmask
-        self.out_seq_length = out_seq_length
-        #### for debug
+        # #### for debug
+        # self.inputs = inputs
+        # self.seq_length = seq_length
+        # self.fmask = fmask
+        # self.bmask = bmask
+        # self.out_seq_length = out_seq_length
+        # #### for debug
 
         batch_size = int(inputs.size(0))
         sw_seq_len = int(inputs.size(1))
@@ -71,10 +70,15 @@ class ContextualLSTM(nn.Module):
         max_seq_len = seq_length.max()
         for batch_i in range(batch_size):
             reverse_idx = torch.LongTensor([idx for idx in range(seq_length[batch_i]-1, -1, -1)] + list(range(seq_length[batch_i], max_seq_len)))
+            if self.gpu:
+                reverse_idx = reverse_idx.cuda()
             reverse_inputs.append(inputs[batch_i].index_select(0, reverse_idx))
             reverse_bmasks.append(bmask[batch_i].index_select(0, reverse_idx))
         reverse_inputs_tensor = torch.cat(reverse_inputs).long().view(batch_size, max_seq_len)
         reverse_bmask_tensor = torch.cat(reverse_bmasks).byte().view(batch_size, max_seq_len)
+        if self.gpu:
+            reverse_inputs_tensor = reverse_inputs_tensor.cuda()
+            reverse_bamsk_tensor = reverse_bmask_tensor.cuda()
         # Backward LSTM
         embeds = self.drop(self.embeddings(reverse_inputs_tensor))
         pack_input = pack_padded_sequence(embeds, seq_length, True)
@@ -96,9 +100,12 @@ class ContextualLSTM(nn.Module):
         bmasked_outs = []
         for batch_i in range(batch_size):
             reverse_idx = torch.LongTensor([idx for idx in range(out_seq_length-1, max(out_seq_length-seq_length[batch_i], 0)-1, -1)] + list(range(0, out_seq_length-seq_length[batch_i])))
+            if self.gpu:
+                reverse_idx = reverse_idx.cuda()
             bmasked_outs.append(bmasked_out[batch_i].index_select(0, reverse_idx))
         bmasked_out = torch.cat(bmasked_outs).view(batch_size, out_seq_length, self.hidden_dim)
-
+        if self.gpu:
+            return torch.cat([fmasked_out, bmasked_out], dim=2).cuda()
         return torch.cat([fmasked_out, bmasked_out], dim=2)
 
     def get_last_hidden(self, inputs, seq_length):

@@ -70,6 +70,7 @@ class WordRep(nn.Module):
                 hidden_dim=self.sw_hidden_dim,
                 dropout=data.HP_dropout,
                 gpu=data.HP_gpu) for i in range(self.sw_num)]
+        print(self.contextual_lstms)
 
         if self.gpu:
             self.drop = self.drop.cuda()

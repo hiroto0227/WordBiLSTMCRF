@@ -324,11 +324,11 @@ def batchify_with_label(input_batch_list, gpu, if_train=True):
         label_seq_tensor = label_seq_tensor.cuda()
         char_seq_tensor = char_seq_tensor.cuda()
         char_seq_recover = char_seq_recover.cuda()
-        [sw_seqs_tensor[idx].cuda() for idx in range(sw_num)]
-        [sw_seqs_lengths[idx].cuda() for idx in range(sw_num)]
-        [sw_seqs_recover[idx].cuda() for idx in range(sw_num)]
-        [sw_seqs_fmask[idx].cuda() for idx in range(sw_num)]
-        [sw_seqs_bmask[idx].cuda() for idx in range(sw_num)]
+        sw_seqs_tensor = [sw_seqs_tensor[idx].cuda() for idx in range(sw_num)]
+        sw_seqs_lengths = [sw_seqs_lengths[idx].cuda() for idx in range(sw_num)]
+        sw_seqs_recover = [sw_seqs_recover[idx].cuda() for idx in range(sw_num)]
+        sw_seqs_fmask = [sw_seqs_fmask[idx].cuda() for idx in range(sw_num)]
+        sw_seqs_bmask = [sw_seqs_bmask[idx].cuda() for idx in range(sw_num)]
         mask = mask.cuda()
     return word_seq_tensor,feature_seq_tensors, word_seq_lengths, word_seq_recover, char_seq_tensor, char_seq_lengths, char_seq_recover, sw_seqs_tensor, sw_seqs_lengths, sw_seqs_recover, sw_seqs_fmask, sw_seqs_bmask, label_seq_tensor, mask
 
@@ -419,44 +419,44 @@ def train(data):
             print("ERROR: LOSS EXPLOSION (>1e8) ! PLEASE SET PROPER PARAMETERS AND STRUCTURE! EXIT....")
             exit(1)
         # continue
-        #speed, acc, p, r, f, _,_ = evaluate(data, model, "dev")
-        #dev_finish = time.time()
-        #dev_cost = dev_finish - epoch_finish
+        speed, acc, p, r, f, _,_ = evaluate(data, model, "dev")
+        dev_finish = time.time()
+        dev_cost = dev_finish - epoch_finish
 
-        #if data.seg:
-        #    current_score = f
-        #    print("Dev: time: %.2fs, speed: %.2fst/s; acc: %.4f, p: %.4f, r: %.4f, f: %.4f"%(dev_cost, speed, acc, p, r, f))
-        #else:
-        #    current_score = acc
-        #    print("Dev: time: %.2fs speed: %.2fst/s; acc: %.4f"%(dev_cost, speed, acc))
+        if data.seg:
+           current_score = f
+           print("Dev: time: %.2fs, speed: %.2fst/s; acc: %.4f, p: %.4f, r: %.4f, f: %.4f"%(dev_cost, speed, acc, p, r, f))
+        else:
+           current_score = acc
+           print("Dev: time: %.2fs speed: %.2fst/s; acc: %.4f"%(dev_cost, speed, acc))
 
-        #if current_score > best_dev:
-        #    if data.seg:
-        #        print("Exceed previous best f score:", best_dev)
-        #    else:
-        #        print("Exceed previous best acc score:", best_dev)
-        #    model_name = data.model_dir +'.'+ str(idx) + ".model"
-        #    print("Save current best model in file:", model_name)
-        #    torch.save(model.state_dict(), model_name)
-        #    best_dev = current_score
+        if current_score > best_dev:
+           if data.seg:
+               print("Exceed previous best f score:", best_dev)
+           else:
+               print("Exceed previous best acc score:", best_dev)
+           model_name = data.model_dir +'.'+ str(idx) + ".model"
+           print("Save current best model in file:", model_name)
+           torch.save(model.state_dict(), model_name)
+           best_dev = current_score
 
-        # ## decode test
-        #speed, acc, p, r, f, _,_ = evaluate(data, model, "test")
-        #test_finish = time.time()
-        #test_cost = test_finish - dev_finish
-        #if data.seg:
-        #    print("Test: time: %.2fs, speed: %.2fst/s; acc: %.4f, p: %.4f, r: %.4f, f: %.4f"%(test_cost, speed, acc, p, r, f))
-        #else:
-        #    print("Test: time: %.2fs, speed: %.2fst/s; acc: %.4f"%(test_cost, speed, acc))
-        if  idx % 10 == 0:
-            model_name = data.model_dir +'.'+ str(idx) + ".model"
-            torch.save(model.state_dict(), model_name)
+        ## decode test
+        speed, acc, p, r, f, _,_ = evaluate(data, model, "test")
+        test_finish = time.time()
+        test_cost = test_finish - dev_finish
+        if data.seg:
+           print("Test: time: %.2fs, speed: %.2fst/s; acc: %.4f, p: %.4f, r: %.4f, f: %.4f"%(test_cost, speed, acc, p, r, f))
+        else:
+           print("Test: time: %.2fs, speed: %.2fst/s; acc: %.4f"%(test_cost, speed, acc))
+        # if  idx % 10 == 0:
+        #     model_name = data.model_dir +'.'+ str(idx) + ".model"
+        #     torch.save(model.state_dict(), model_name)
         gc.collect()
 
 
 def load_model_decode(data, name):
     print("Load Model from file: ", data.model_dir)
-    model = SeqModel(data)
+    model = SeqLabel(data)
     ## load model need consider if the model trained in GPU and load in CPU, or vice versa
     # if not gpu:
     #     model.load_state_dict(torch.load(model_dir))
