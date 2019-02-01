@@ -26,10 +26,10 @@ except ImportError:
     import pickle
 
 
-seed_num = 42
-random.seed(seed_num)
-torch.manual_seed(seed_num)
-np.random.seed(seed_num)
+#seed_num = 42
+#random.seed(seed_num)
+#torch.manual_seed(seed_num)
+#np.random.seed(seed_num)
 
 
 def data_initialization(data):
@@ -203,7 +203,7 @@ def evaluate(data, model, name, nbest=None):
     decode_time = time.time() - start_time
     speed = len(instances)/decode_time
     acc, p, r, f, golden_counter, predict_counter, right_counter = get_ner_fmeasure(sentence_list, gold_results, pred_results, data.tagScheme)
-    integrate_counters_to_csv(predict_counter, golden_counter, data.load_model_dir + ".analysis.csv")
+    #integrate_counters_to_csv(predict_counter, golden_counter, data.load_model_dir + ".analysis.csv")
     if nbest:
         return speed, acc, p, r, f, nbest_pred_results, pred_scores
     return speed, acc, p, r, f, pred_results, pred_scores
@@ -352,12 +352,12 @@ def batchify_with_label(input_batch_list, gpu, if_train=True):
 
 
 def train(data):
-    print("Training model...")
+    #print("Training model...")
     #data.show_data_summary()
     #save_data_name = data.model_dir +".dset"
     #data.save(save_data_name)
     model = SeqLabel(data)
-    print(model)
+    #print(model)
     # loss_function = nn.NLLLoss()
     if data.optimizer.lower() == "sgd":
         optimizer = optim.SGD(model.parameters(), lr=data.HP_lr, momentum=data.HP_momentum,weight_decay=data.HP_l2)
@@ -491,12 +491,12 @@ def load_model_decode(data, name):
     return pred_results, pred_scores
 
 
-def set_paramter(data):
+def set_parameter(data):
     batch_size = random.choice([8, 16, 32])
-    learning_rate = np.random.uniform(0.0001, 0.1, 1)
+    learning_rate = random.choice([0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1])
     sub_hidden = random.choice([50, 100, 150, 200])
-    dropout = np.random.uniform(0.2, 0.6, 1)
-    lr_decay = np.random.uniform(1e-5, 1e-3, 1)
+    dropout = np.random.uniform(0.2, 0.6, 1)[0]
+    lr_decay = random.choice([1e-6, 1e-5, 1e-4, 1e-3, 1e-2])
     data.HP_batch_size = batch_size
     data.HP_lr = learning_rate
     data.HP_sw_hidden_dim = sub_hidden
@@ -516,7 +516,6 @@ if __name__ == '__main__':
     data.read_config(args.config)
     data.show_data_summary()
     status = data.status.lower()
-    print("Seed num:",seed_num)
     trial = 50
 
     if status == 'train':
@@ -527,7 +526,8 @@ if __name__ == '__main__':
         data.generate_instance('test')
         data.build_pretrain_emb()
         for i in range(trial):
-            print("trial: {}".format(trial))
+            print("Trial: {}/{}".format(i, trial))
+            data = set_parameter(data)
             print("RandomizedParam:bs:{},lr:{},sub_h:{},do:{},decay:{}".format(
                 data.HP_batch_size,
                 data.HP_lr,
@@ -535,7 +535,6 @@ if __name__ == '__main__':
                 data.HP_dropout,
                 data.HP_lr_decay
             ))
-            data = set_parameter(data)
             best_epoch, best_dev_scores, best_test_scores = train(data)
             print("BestEpoch:{},dev-p:{},dev-r:{},dev-f:{},test-p:{},test-r:{},test-f:{}".format(
                 best_epoch,
