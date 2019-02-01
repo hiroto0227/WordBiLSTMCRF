@@ -5,29 +5,28 @@ import collections
 import pprint
 
 
-def update_word_counter(matrix, counter, word_list, tag="CHEM"):
+def get_words(matrix, word_list, tag="CHEM"):
+    words = []
     for row in matrix:
         if "," in row:
             start, end = row.replace(tag, "")[1:-1].split(",")
         else:
             start = row.replace(tag, "")[1: -1]
-            end = int(start) + 1
-        counter.update({" ".join(word_list[int(start):int(end)+1]): 1})
-    return counter
+            end = int(start)
+        #print(" ".join(word_list[int(start):int(end) + 1]))
+        words.append(" ".join(word_list[int(start):int(end) + 1]))
+    return words
 
 ## input as sentence level labelst_ner
 def get_ner_fmeasure(sentence_lists, golden_lists, predict_lists, label_type="BMES"):
-    golden_counter = collections.Counter()
-    predict_counter = collections.Counter()
-    right_counter = collections.Counter()
+    gold_words = []
+    pred_words = []
     sent_num = len(golden_lists)
-    golden_full = []
-    predict_full = []
-    right_full = []
     right_tag = 0
     all_tag = 0
     for idx in range(0,sent_num):
-        word_list = sentence_lists[idx]
+        #word_list = [str(idx) + "_" + str(i) + "_" + word for i, word in enumerate(sentence_lists[idx])]
+        word_list = [word for i, word in enumerate(sentence_lists[idx])]
         golden_list = golden_lists[idx]
         predict_list = predict_lists[idx]
         for idy in range(len(golden_list)):
@@ -40,16 +39,19 @@ def get_ner_fmeasure(sentence_lists, golden_lists, predict_lists, label_type="BM
         else:
             gold_matrix = get_ner_BIO(golden_list, word_list)
             pred_matrix = get_ner_BIO(predict_list, word_list)
-        right_ner = list(set(gold_matrix).intersection(set(pred_matrix)))
-        golden_counter = update_word_counter(gold_matrix, golden_counter, word_list)
-        predict_counter = update_word_counter(pred_matrix, predict_counter, word_list)
-        right_counter = update_word_counter(right_ner, right_counter, word_list)
-        golden_full += gold_matrix
-        predict_full += pred_matrix
-        right_full += right_ner
-    right_num = len(right_full)
-    golden_num = len(golden_full)
-    predict_num = len(predict_full)
+        gold_words.extend(get_words(gold_matrix, word_list))
+        pred_words.extend(get_words(pred_matrix, word_list))
+    right_num, predict_num, golden_num = 0, 0, 0
+    for uniq_word in set(gold_words + pred_words):
+        gold_flag, pred_flag = False, False
+        if uniq_word in pred_words:
+            predict_num += 1
+            pred_flag = True
+        if uniq_word in gold_words:
+            golden_num += 1
+            gold_flag = True
+        if pred_flag and gold_flag:
+            right_num += 1
     if predict_num == 0:
         precision = -1
     else:
@@ -65,7 +67,7 @@ def get_ner_fmeasure(sentence_lists, golden_lists, predict_lists, label_type="BM
     accuracy = (right_tag+0.0)/all_tag
     # print "Accuracy: ", right_tag,"/",all_tag,"=",accuracy
     print("gold_num = ", golden_num, " pred_num = ", predict_num, " right_num = ", right_num)
-    return accuracy, precision, recall, f_measure, golden_counter, predict_counter, right_counter
+    return accuracy, precision, recall, f_measure, gold_words, pred_words
 
 
 def reverse_style(input_string):

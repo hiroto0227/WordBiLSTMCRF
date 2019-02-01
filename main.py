@@ -172,6 +172,7 @@ def evaluate(data, model, name, nbest=None):
     start_time = time.time()
     train_num = len(instances)
     total_batch = train_num//batch_size+1
+    print(len(instances))
     for batch_id in range(total_batch):
         start = batch_id*batch_size
         end = (batch_id+1)*batch_size
@@ -202,20 +203,10 @@ def evaluate(data, model, name, nbest=None):
         gold_results += gold_label
     decode_time = time.time() - start_time
     speed = len(instances)/decode_time
-    acc, p, r, f, golden_counter, predict_counter, right_counter = get_ner_fmeasure(sentence_list, gold_results, pred_results, data.tagScheme)
-    integrate_counters_to_csv(predict_counter, golden_counter, data.load_model_dir + ".analysis.csv")
+    acc, p, r, f, gold_words, pred_words = get_ner_fmeasure(sentence_list, gold_results, pred_results, data.tagScheme)
     if nbest:
         return speed, acc, p, r, f, nbest_pred_results, pred_scores
-    return speed, acc, p, r, f, pred_results, pred_scores
-
-
-def integrate_counters_to_csv(predict_counter, golden_counter, outpath):
-    p_set = set(predict_counter.keys())
-    g_set = set(golden_counter.keys())
-    with open(outpath, "wt") as f:
-        f.write("vocab,pred_num,right_num\n")
-        for v in (p_set | g_set):
-            f.write("{},{},{}\n".format(v.replace("\n", "").replace(",", ""), predict_counter[v], golden_counter[v]))
+    return speed, acc, p, r, f, gold_words, pred_words
 
 
 def batchify_with_label(input_batch_list, gpu, if_train=True):
