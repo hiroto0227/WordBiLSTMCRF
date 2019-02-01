@@ -1,4 +1,5 @@
 Repository/
+config/
 
 __pycache__/
 *.pyc
