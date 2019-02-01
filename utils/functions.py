@@ -8,6 +8,7 @@ from __future__ import absolute_import
 import sys
 import numpy as np
 
+
 def normalize_word(word):
     new_word = ""
     for char in word:
@@ -85,6 +86,8 @@ def read_instance(input_file, word_alphabet, char_alphabet, sw_alphabet_list, fe
                 sw_fmask = []
                 sw_bmask = []
                 for sw in sp.tokenize(word):
+                    if number_normalized:
+                        sw = normalize_word(sw)
                     sw_list.append(sw)
                     sw_Id.append(sw_alphabet_list[idx].get_index(sw))
                     sw_fmask.append(0)
