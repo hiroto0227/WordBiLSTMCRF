@@ -240,9 +240,9 @@ class Data:
                 ####### Sub Word ######
                 #print("=======================================")
                 for sw_id, sp in enumerate(self.sentence_piece_models):
-                    #print("-----------------")
                     for sw in sp.tokenize(word):
-                        #print(sw)
+                        if self.number_normalized:
+                            sw = normalize_word(sw)
                         self.sw_alphabet_list[sw_id].add(sw)
         self.word_alphabet_size = self.word_alphabet.size()
         self.char_alphabet_size = self.char_alphabet.size()

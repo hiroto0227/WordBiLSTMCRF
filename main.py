@@ -14,7 +14,8 @@ import gc
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
-from utils.metric import get_ner_fmeasure
+# from utils.metric import get_ner_fmeasure
+from evaluate.evaluate import get_ner_fmeasure
 from model.seqlabel import SeqLabel
 from model.sentclassifier import SentClassifier
 from utils.data import Data
@@ -164,6 +165,7 @@ def evaluate(data, model, name, nbest=None):
     pred_scores = []
     pred_results = []
     gold_results = []
+    sentence_list = []
     ## set model in eval model
     model.eval()
     batch_size = data.HP_batch_size
@@ -190,14 +192,30 @@ def evaluate(data, model, name, nbest=None):
             tag_seq = model(batch_word, batch_features, batch_wordlen, batch_char, batch_charlen, batch_charrecover, batch_sws, batch_swlens, batch_swrecovers, batch_swfmask, batch_swbmask, mask)
         # print("tag:",tag_seq)
         pred_label, gold_label = recover_label(tag_seq, batch_label, mask, data.label_alphabet, batch_wordrecover)
+        for i in range(len(pred_label)):
+            _s = []
+            for w in batch_word[batch_wordrecover][i]:
+                if w:
+                    _s.append(data.word_alphabet.get_instance(int(w)))
+            sentence_list.append(_s)
         pred_results += pred_label
         gold_results += gold_label
     decode_time = time.time() - start_time
     speed = len(instances)/decode_time
-    acc, p, r, f = get_ner_fmeasure(gold_results, pred_results, data.tagScheme)
+    acc, p, r, f, golden_counter, predict_counter, right_counter = get_ner_fmeasure(sentence_list, gold_results, pred_results, data.tagScheme)
+    integrate_counters_to_csv(predict_counter, golden_counter, data.load_model_dir + ".analysis.csv")
     if nbest:
         return speed, acc, p, r, f, nbest_pred_results, pred_scores
     return speed, acc, p, r, f, pred_results, pred_scores
+
+
+def integrate_counters_to_csv(predict_counter, golden_counter, outpath):
+    p_set = set(predict_counter.keys())
+    g_set = set(golden_counter.keys())
+    with open(outpath, "wt") as f:
+        f.write("vocab,pred_num,right_num\n")
+        for v in (p_set | g_set):
+            f.write("{},{},{}\n".format(v.replace("\n", "").replace(",", ""), predict_counter[v], golden_counter[v]))
 
 
 def batchify_with_label(input_batch_list, gpu, if_train=True):
@@ -335,27 +353,15 @@ def batchify_with_label(input_batch_list, gpu, if_train=True):
 
 def train(data):
     print("Training model...")
-    data.show_data_summary()
-    save_data_name = data.model_dir +".dset"
-    data.save(save_data_name)
+    #data.show_data_summary()
+    #save_data_name = data.model_dir +".dset"
+    #data.save(save_data_name)
     model = SeqLabel(data)
     print(model)
     # loss_function = nn.NLLLoss()
     if data.optimizer.lower() == "sgd":
         optimizer = optim.SGD(model.parameters(), lr=data.HP_lr, momentum=data.HP_momentum,weight_decay=data.HP_l2)
-    elif data.optimizer.lower() == "adagrad":
-        optimizer = optim.Adagrad(model.parameters(), lr=data.HP_lr, weight_decay=data.HP_l2)
-    elif data.optimizer.lower() == "adadelta":
-        optimizer = optim.Adadelta(model.parameters(), lr=data.HP_lr, weight_decay=data.HP_l2)
-    elif data.optimizer.lower() == "rmsprop":
-        optimizer = optim.RMSprop(model.parameters(), lr=data.HP_lr, weight_decay=data.HP_l2)
-    elif data.optimizer.lower() == "adam":
-        optimizer = optim.Adam(model.parameters(), lr=data.HP_lr, weight_decay=data.HP_l2)
-    else:
-        print("Optimizer illegal: %s"%(data.optimizer))
-        exit(1)
     best_dev = -10
-    # data.HP_iteration = 1
     ## start training
     for idx in range(data.HP_iteration):
         epoch_start = time.time()
@@ -373,6 +379,9 @@ def train(data):
         ## set model in train model
         model.train()
         model.zero_grad()
+        best_epoch = 0
+        best_dev_scores = (-1, -1, -1)
+        best_test_scores = (-1, -1, -1)
         batch_size = data.HP_batch_size
         batch_id = 0
         train_num = len(data.train_Ids)
@@ -387,18 +396,17 @@ def train(data):
                 continue
             batch_word, batch_features, batch_wordlen, batch_wordrecover, batch_char, batch_charlen, batch_charrecover, batch_sws, batch_swlens, batch_swrecovers, batch_swfmask, batch_swbmask, batch_label, mask  = batchify_with_label(instance, data.HP_gpu, True)
             instance_count += 1
-            loss, tag_seq = model.neg_log_likelihood_loss(batch_word,batch_features, batch_wordlen, batch_char, batch_charlen, batch_charrecover, batch_sws, batch_swlens, batch_swrecovers, batch_swfmask, batch_swbmask, batch_label, mask)
+            loss, tag_seq = model.neg_log_likelihood_loss(batch_word, batch_features, batch_wordlen, batch_char, batch_charlen, batch_charrecover, batch_sws, batch_swlens, batch_swrecovers, batch_swfmask, batch_swbmask, batch_label, mask)
             right, whole = predict_check(tag_seq, batch_label, mask)
             right_token += right
             whole_token += whole
-            # print("loss:",loss.item())
             sample_loss += loss.item()
             total_loss += loss.item()
             if end%500 == 0:
                 temp_time = time.time()
                 temp_cost = temp_time - temp_start
                 temp_start = temp_time
-                print("     Instance: %s; Time: %.2fs; loss: %.4f; acc: %s/%s=%.4f"%(end, temp_cost, sample_loss, right_token, whole_token,(right_token+0.)/whole_token))
+                print("    Instance: %s; Time: %.2fs; loss: %.4f; acc: %s/%s=%.4f"%(end, temp_cost, sample_loss, right_token, whole_token,(right_token+0.)/whole_token))
                 if sample_loss > 1e8 or str(sample_loss) == "nan":
                     print("ERROR: LOSS EXPLOSION (>1e8) ! PLEASE SET PROPER PARAMETERS AND STRUCTURE! EXIT....")
                     exit(1)
@@ -409,7 +417,7 @@ def train(data):
             model.zero_grad()
         temp_time = time.time()
         temp_cost = temp_time - temp_start
-        print("     Instance: %s; Time: %.2fs; loss: %.4f; acc: %s/%s=%.4f"%(end, temp_cost, sample_loss, right_token, whole_token,(right_token+0.)/whole_token))
+        print("    Instance: %s; Time: %.2fs; loss: %.4f; acc: %s/%s=%.4f"%(end, temp_cost, sample_loss, right_token, whole_token,(right_token+0.)/whole_token))
 
         epoch_finish = time.time()
         epoch_cost = epoch_finish - epoch_start
@@ -438,6 +446,8 @@ def train(data):
            model_name = data.model_dir +'.'+ str(idx) + ".model"
            print("Save current best model in file:", model_name)
            torch.save(model.state_dict(), model_name)
+           best_epoch = idx
+           best_dev_scores = (p, r, f)
            best_dev = current_score
 
         ## decode test
@@ -448,26 +458,28 @@ def train(data):
            print("Test: time: %.2fs, speed: %.2fst/s; acc: %.4f, p: %.4f, r: %.4f, f: %.4f"%(test_cost, speed, acc, p, r, f))
         else:
            print("Test: time: %.2fs, speed: %.2fst/s; acc: %.4f"%(test_cost, speed, acc))
+        if best_test_scores[2] < f:
+            best_test_scores = (p, r, f)
         # if  idx % 10 == 0:
         #     model_name = data.model_dir +'.'+ str(idx) + ".model"
         #     torch.save(model.state_dict(), model_name)
         gc.collect()
+    return best_epoch, best_dev_scores, best_test_scores
 
 
 def load_model_decode(data, name):
     print("Load Model from file: ", data.model_dir)
     model = SeqLabel(data)
-    ## load model need consider if the model trained in GPU and load in CPU, or vice versa
-    # if not gpu:
-    #     model.load_state_dict(torch.load(model_dir))
-    #     # model.load_state_dict(torch.load(model_dir), map_location=lambda storage, loc: storage)
-    #     # model = torch.load(model_dir, map_location=lambda storage, loc: storage)
-    # else:
-    #     model.load_state_dict(torch.load(model_dir))
-    #     # model = torch.load(model_dir)
-    model.load_state_dict(torch.load(data.load_model_dir))
-
-    print("Decode %s data, nbest: %s ..."%(name, data.nbest))
+    # load model need consider if the model trained in GPU and load in CPU, or vice versa
+    if not data.HP_gpu:
+        # model.load_state_dict(torch.load(data.load_model_dir))
+        model.load_state_dict(torch.load(data.load_model_dir, map_location=lambda storage, loc: storage))
+        # model = torch.load(data.load_model_dir, map_location=lambda storage, loc: storage)
+    else:
+        model.load_state_dict(torch.load(data.load_model_dir))
+        # model = torch.load(data.load_model_dir)
+    # model.load_state_dict(torch.load(data.load_model_dir))
+    # print("Decode %s data, nbest: %s ..."%(name, data.nbest))
     start_time = time.time()
     speed, acc, p, r, f, pred_results, pred_scores = evaluate(data, model, name, data.nbest)
     end_time = time.time()
@@ -479,6 +491,18 @@ def load_model_decode(data, name):
     return pred_results, pred_scores
 
 
+def set_paramter(data):
+    batch_size = random.choice([8, 16, 32])
+    learning_rate = np.random.uniform(0.0001, 0.1, 1)
+    sub_hidden = random.choice([50, 100, 150, 200])
+    dropout = np.random.uniform(0.2, 0.6, 1)
+    lr_decay = np.random.uniform(1e-5, 1e-3, 1)
+    data.HP_batch_size = batch_size
+    data.HP_lr = learning_rate
+    data.HP_sw_hidden_dim = sub_hidden
+    data.HP_dropout = dropout
+    data.HP_lr_decay = lr_decay
+    return data
 
 
 if __name__ == '__main__':
@@ -493,6 +517,7 @@ if __name__ == '__main__':
     data.show_data_summary()
     status = data.status.lower()
     print("Seed num:",seed_num)
+    trial = 50
 
     if status == 'train':
         print("MODEL: train")
@@ -501,7 +526,26 @@ if __name__ == '__main__':
         data.generate_instance('dev')
         data.generate_instance('test')
         data.build_pretrain_emb()
-        train(data)
+        for i in range(trial):
+            print("trial: {}".format(trial))
+            print("RandomizedParam:bs:{},lr:{},sub_h:{},do:{},decay:{}".format(
+                data.HP_batch_size,
+                data.HP_lr,
+                data.HP_sw_hidden_dim,
+                data.HP_dropout,
+                data.HP_lr_decay
+            ))
+            data = set_parameter(data)
+            best_epoch, best_dev_scores, best_test_scores = train(data)
+            print("BestEpoch:{},dev-p:{},dev-r:{},dev-f:{},test-p:{},test-r:{},test-f:{}".format(
+                best_epoch,
+                best_dev_scores[0],
+                best_dev_scores[1],
+                best_dev_scores[2],
+                best_test_scores[0],
+                best_test_scores[1],
+                best_test_scores[2],
+                ))
     elif status == 'decode':
         print("MODEL: decode")
         data.load(data.dset_dir)
