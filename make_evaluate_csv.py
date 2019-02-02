@@ -52,11 +52,9 @@ if __name__ == "__main__":
 
     gold_words, pred_words_list = evaluate_models(models, datas)
     all_words = set(gold_words + [pred_word for pred_words in pred_words_list for pred_word in pred_words])
-    print(len(datas[0].word_alphabet.instances))
-    datas[0].initial_feature_alphabets()
+    
     datas[0].word_alphabet = Alphabet('word')
     datas[0].build_alphabet(data.train_dir)
-    print(len(datas[0].word_alphabet.instances))
     raws = []
 
     for word in all_words:

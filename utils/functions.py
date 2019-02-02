@@ -6,8 +6,11 @@
 from __future__ import print_function
 from __future__ import absolute_import
 import sys
+import re
 import numpy as np
 
+
+cammel_re = re.compile("^[A-Z][a-z0-9]+$")
 
 def normalize_word(word):
     new_word = ""
@@ -18,6 +21,10 @@ def normalize_word(word):
             new_word += char
     return new_word
 
+def cammel_normalize_word(word):
+    if cammel_re.match(word):
+        return word.lower()
+    return word
 
 def read_instance(input_file, word_alphabet, char_alphabet, sw_alphabet_list, feature_alphabets, label_alphabet, number_normalized, max_sent_length, sentencepieces, char_padding_size=-1, char_padding_symbol = '</pad>'):
     feature_num = len(feature_alphabets)
