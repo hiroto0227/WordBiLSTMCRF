@@ -49,15 +49,22 @@ if __name__ == "__main__":
         models.append(model)
         names.append(os.path.split(args.__getattribute__("m{}".format(i + 1)))[-1])
 
+    print(len(datas[0].word_alphabet.instances))
+    datas[0].initial_feature_alphabets()
+    datas[0].build_alphabet(data.train_dir)
+    print(len(datas[0].word_alphabet.instances))
     gold_words, pred_words_list = evaluate_models(models, datas)
     all_words = set(gold_words + [pred_word for pred_words in pred_words_list for pred_word in pred_words])
     raws = []
+
     for word in all_words:
-        raw = {"word": re.sub("\d+_\d+_", "", word)}
-        if raw["word"] in datas[0].word_alphabet.instances:
-            raw["invocab"] = 1
-        else:
-            raw["invocab"] = 0
+        raw = {"word": re.sub("\d+_\d+_", "", word), "iv_num": 0, "oov_num": 0, "word_num": 0}
+        for w in raw["word"].split(" "):
+            if w in datas[0].word_alphabet.instances:
+                raw["iv_num"] += 1
+            else:
+                raw["oov_num"] += 1
+            raw["word_num"] += 1
         if word in gold_words:
             raw["gold"] = 1
         else:
