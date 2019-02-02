@@ -1,8 +1,0 @@
-O = "O"
-#B = "B"
-B = "B-CHEM"
-#I = "I"
-I = "I-CHEM"
-PAD = "<PAD>"
-UNK = "<UNK>"
-ZERO = "<ZERO>"
