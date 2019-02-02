@@ -26,10 +26,10 @@ except ImportError:
     import pickle
 
 
-#seed_num = 42
-#random.seed(seed_num)
-#torch.manual_seed(seed_num)
-#np.random.seed(seed_num)
+seed_num = 42
+random.seed(seed_num)
+torch.manual_seed(seed_num)
+np.random.seed(seed_num)
 
 
 def data_initialization(data):
@@ -508,7 +508,7 @@ if __name__ == '__main__':
     data.read_config(args.config)
     data.show_data_summary()
     status = data.status.lower()
-    trial = 50
+    trial = 1
 
     if status == 'train':
         print("MODEL: train")
@@ -519,14 +519,14 @@ if __name__ == '__main__':
         data.build_pretrain_emb()
         for i in range(trial):
             print("Trial: {}/{}".format(i, trial))
-            data = set_parameter(data)
-            print("RandomizedParam:bs:{},lr:{},sub_h:{},do:{},decay:{}".format(
-                data.HP_batch_size,
-                data.HP_lr,
-                data.HP_sw_hidden_dim,
-                data.HP_dropout,
-                data.HP_lr_decay
-            ))
+            #data = set_parameter(data)
+            #print("RandomizedParam:bs:{},lr:{},sub_h:{},do:{},decay:{}".format(
+            #    data.HP_batch_size,
+            #    data.HP_lr,
+            #    data.HP_sw_hidden_dim,
+            #    data.HP_dropout,
+            #    data.HP_lr_decay
+            #))
             best_epoch, best_dev_scores, best_test_scores = train(data)
             print("BestEpoch:{},dev-p:{},dev-r:{},dev-f:{},test-p:{},test-r:{},test-f:{}".format(
                 best_epoch,

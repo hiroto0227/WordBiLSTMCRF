@@ -41,7 +41,7 @@ if __name__ == "__main__":
     names = []
     for i in range(args.n):
         data = Data()
-        data.load("Repository/TrainedModel/bilstmcrf_charlstm.dset")
+        data.load(args.__getattribute__("d{}".format(i + 1)))
         data.HP_gpu = False
         model = SeqLabel(data)
         model.load_state_dict(torch.load(args.__getattribute__("m{}".format(i + 1)), map_location=lambda storage, loc: storage))
