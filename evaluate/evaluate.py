@@ -26,7 +26,6 @@ def get_ner_fmeasure(sentence_lists, golden_lists, predict_lists, label_type="BM
     all_tag = 0
     for idx in range(0,sent_num):
         word_list = [str(idx) + "_" + str(i) + "_" + word for i, word in enumerate(sentence_lists[idx])]
-        #word_list = [word for i, word in enumerate(sentence_lists[idx])]
         golden_list = golden_lists[idx]
         predict_list = predict_lists[idx]
         for idy in range(len(golden_list)):

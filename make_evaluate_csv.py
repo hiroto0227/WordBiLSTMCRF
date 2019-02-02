@@ -21,8 +21,8 @@ def evaluate_models(models, datas, name="test"):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Tuning with NCRF++')
     parser.add_argument('-n', type=int, help='num')
-    parser.add_argument('-m1', help='model 1')
-    parser.add_argument('-d1', help='data 1')
+    parser.add_argument('-m1', help='model 1 (baseline)')
+    parser.add_argument('-d1', help='data 1 (baseline)')
     parser.add_argument('-m2', help='model 2')
     parser.add_argument('-d2', help='data 2')
     parser.add_argument('-m3', help='model 3')
@@ -54,6 +54,10 @@ if __name__ == "__main__":
     raws = []
     for word in all_words:
         raw = {"word": re.sub("\d+_\d+_", "", word)}
+        if raw["word"] in datas[0].word_alphabet.instances:
+            raw["invocab"] = 1
+        else:
+            raw["invocab"] = 0
         if word in gold_words:
             raw["gold"] = 1
         else:
