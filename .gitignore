@@ -4,6 +4,8 @@ config/
 __pycache__/
 *.pyc
 *.ipynb
+*.csv
+*.config
 
 .ipynb_checkpoints/
 .mypy_cache/

@@ -27,6 +27,7 @@ class Data:
         self.MAX_SENTENCE_LENGTH = 250
         self.MAX_WORD_LENGTH = -1
         self.number_normalized = True
+        self.cammel_normalized = True
         self.norm_word_emb = False
         self.norm_char_emb = False
         self.norm_sw_emb = False
@@ -132,6 +133,7 @@ class Data:
         print("     MAX SENTENCE LENGTH: %s"%(self.MAX_SENTENCE_LENGTH))
         print("     MAX   WORD   LENGTH: %s"%(self.MAX_WORD_LENGTH))
         print("     Number   normalized: %s"%(self.number_normalized))
+        print("     Cammel   normalized: %s"%(self.cammel_normalized))
         print("     Word  alphabet size: %s"%(self.word_alphabet_size))
         print("     Char  alphabet size: %s"%(self.char_alphabet_size))
         print("     Label alphabet size: %s"%(self.label_alphabet_size))
@@ -228,6 +230,8 @@ class Data:
                     word = word.decode('utf-8')
                 if self.number_normalized:
                     word = normalize_word(word)
+                if self.cammel_normalized:
+                    word = cammel_normalize_word(word)
                 label = pairs[-1]
                 self.label_alphabet.add(label)
                 self.word_alphabet.add(word)
@@ -243,6 +247,8 @@ class Data:
                     for sw in sp.tokenize(word):
                         if self.number_normalized:
                             sw = normalize_word(sw)
+                        if self.cammel_normalized:
+                            sw = cammel_normalize_word(sw)
                         self.sw_alphabet_list[sw_id].add(sw)
         self.word_alphabet_size = self.word_alphabet.size()
         self.char_alphabet_size = self.char_alphabet.size()
@@ -460,7 +466,9 @@ class Data:
         the_item = 'number_normalized'
         if the_item in config:
             self.number_normalized = str2bool(config[the_item])
-
+        the_item = 'cammel_normalized'
+        if the_item in config:
+            self.cammel_normalized = str2bool(config[the_item])
         the_item = 'seg'
         if the_item in config:
             self.seg = str2bool(config[the_item])
