@@ -60,7 +60,7 @@ python-crfsuite==0.9.6
 python-dateutil==2.7.3
 pytorch-crf==0.5.1
 pytz==2018.5
-PyYAML==3.13
+PyYAML==5.4
 pyzmq==17.1.0
 qtconsole==4.3.1
 requests==2.19.1
